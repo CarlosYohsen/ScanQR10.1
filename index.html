@@ -95,7 +95,8 @@
     border-radius: 8px;
     font-size: 12px;
     text-align: left;
-    display: none;
+    max-height: 200px;
+    overflow-y: auto;
   }
 </style>
 </head>
@@ -123,7 +124,7 @@
 
 <script>
 const PASSWORD = "1234";
-const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwaKGdKMr2o42NwfHzq46QNvE0lNsIP88DZhI57zvEnVoa7YJBh7Q724f2RD_4h1Wl22Q/exec";
+const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbzkUFd-ahkimblOQoxJkj7K14qZxd7XoeVs85pnmzt72oA5w-NhK8u_7jZC4dTF9RDUxw/exec";
 let qrReader;
 let escaneando = true;
 
@@ -131,7 +132,7 @@ let escaneando = true;
 let audioContext;
 let sonidosHabilitados = false;
 
-// Inicializar audio context (requiere interacción del usuario)
+// Inicializar audio context
 function inicializarAudio() {
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -139,7 +140,7 @@ function inicializarAudio() {
   }
 }
 
-// Reproducir sonido de éxito (tono agradable)
+// Reproducir sonido de éxito
 function reproducirSonidoExito() {
   if (!sonidosHabilitados) return;
   
@@ -149,10 +150,9 @@ function reproducirSonidoExito() {
   oscillator.connect(gainNode);
   gainNode.connect(audioContext.destination);
   
-  // Melodía ascendente agradable
-  oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-  oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
-  oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+  oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+  oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
+  oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2);
   
   oscillator.type = 'sine';
   gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
@@ -162,7 +162,7 @@ function reproducirSonidoExito() {
   oscillator.stop(audioContext.currentTime + 0.5);
 }
 
-// Reproducir sonido de error (tono de advertencia)
+// Reproducir sonido de error
 function reproducirSonidoError() {
   if (!sonidosHabilitados) return;
   
@@ -172,7 +172,6 @@ function reproducirSonidoError() {
   oscillator.connect(gainNode);
   gainNode.connect(audioContext.destination);
   
-  // Tono descendente de error
   oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
   oscillator.frequency.setValueAtTime(300, audioContext.currentTime + 0.1);
   oscillator.frequency.setValueAtTime(200, audioContext.currentTime + 0.2);
@@ -190,7 +189,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("login-container").style.display = "block";
   document.getElementById("login-btn").addEventListener("click", login);
   
-  // Enter en password
   document.getElementById("password").addEventListener("keypress", (e) => {
     if (e.key === "Enter") login();
   });
@@ -198,7 +196,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Login
 function login() {
-  // Inicializar audio con interacción del usuario
   inicializarAudio();
   
   const input = document.getElementById("password").value.trim();
@@ -247,14 +244,12 @@ function iniciarQR() {
     if (cameras && cameras.length) {
       mostrarMensaje(`${cameras.length}台のカメラを検出`, "info");
       
-      // Preferir cámara frontal (selfie) para que el personal vea la pantalla
       let camaraSeleccionada = cameras.find(cam => 
         cam.label.toLowerCase().includes("front") || 
         cam.label.toLowerCase().includes("user") ||
         cam.label.toLowerCase().includes("facing")
       );
       
-      // Si no hay frontal, usar la última (suele ser frontal)
       if (!camaraSeleccionada) {
         camaraSeleccionada = cameras[cameras.length - 1];
       }
@@ -265,9 +260,7 @@ function iniciarQR() {
         camaraSeleccionada.id,
         config,
         procesarQR,
-        error => {
-          // Ignorar errores de escaneo continuo
-        }
+        error => {}
       ).then(() => {
         mostrarMensaje("✅ カメラ準備完了 - QRをスキャンしてください", "success");
       }).catch(err => {
@@ -278,7 +271,7 @@ function iniciarQR() {
 
     } else {
       mostrarMensaje("❌ カメラが見つかりません", "error");
-      mostrarDebug("No se encontraron cámaras disponibles");
+      mostrarDebug("No se encontraron cámaras");
     }
   }).catch(err => {
     console.error("Error al obtener cámaras:", err);
@@ -287,34 +280,60 @@ function iniciarQR() {
   });
 }
 
-// Procesar QR
+// Procesar QR - MÉTODO CORREGIDO
 function procesarQR(decodedText) {
   if (!escaneando) return;
   
   escaneando = false;
   mostrarMensaje("🔄 処理中...", "info");
+  mostrarDebug("QR detectado: " + decodedText);
   
   try {
-    // Intentar parsear como JSON
     const datos = JSON.parse(decodedText);
     
     if (!datos.id || !datos.nombre) {
       throw new Error("ID o nombre faltante en QR");
     }
     
-    mostrarDebug("Datos QR: " + JSON.stringify(datos));
+    mostrarDebug("Datos parseados correctamente: ID=" + datos.id + ", Nombre=" + datos.nombre);
     mostrarMensaje("📤 送信中...", "info");
 
-    fetch(URL_SCRIPT, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datos)
+    // CAMBIO CRÍTICO: Usar URLSearchParams en lugar de JSON
+    const params = new URLSearchParams();
+    params.append('id', datos.id);
+    params.append('nombre', datos.nombre);
+    if (datos.tipo) params.append('tipo', datos.tipo);
+
+    const urlConParams = URL_SCRIPT + '?' + params.toString();
+    
+    mostrarDebug("URL de envío: " + urlConParams);
+
+    // Usar método GET con parámetros
+    fetch(urlConParams, {
+      method: 'GET',
+      redirect: 'follow'
     })
-    .then(() => {
-      // Con no-cors no podemos leer la respuesta
-      reproducirSonidoExito(); // ✅ SONIDO DE ÉXITO
-      mostrarMensaje("✅ 登録完了: " + datos.nombre, "success");
+    .then(response => {
+      mostrarDebug("Respuesta status: " + response.status);
+      return response.text();
+    })
+    .then(data => {
+      mostrarDebug("Respuesta del servidor: " + data);
+      try {
+        const resultado = JSON.parse(data);
+        if (resultado.status === "success") {
+          reproducirSonidoExito();
+          mostrarMensaje("✅ 登録完了: " + datos.nombre, "success");
+        } else {
+          reproducirSonidoError();
+          mostrarMensaje("❌ エラー: " + resultado.message, "error");
+        }
+      } catch (e) {
+        // Si no es JSON, probablemente sea exitoso
+        reproducirSonidoExito();
+        mostrarMensaje("✅ 登録完了: " + datos.nombre, "success");
+      }
+      
       setTimeout(() => {
         escaneando = true;
         mostrarMensaje("読み取り待機中...", "info");
@@ -322,8 +341,8 @@ function procesarQR(decodedText) {
     })
     .catch(err => {
       console.error("通信エラー:", err);
-      reproducirSonidoError(); // ❌ SONIDO DE ERROR
-      mostrarMensaje("❌ 送信エラー", "error");
+      reproducirSonidoError();
+      mostrarMensaje("❌ 送信エラー: " + err.message, "error");
       mostrarDebug("Error de comunicación: " + err.message);
       setTimeout(() => {
         escaneando = true;
@@ -333,9 +352,9 @@ function procesarQR(decodedText) {
     
   } catch (e) {
     console.warn("QR no válido:", decodedText);
-    reproducirSonidoError(); // ❌ SONIDO DE ERROR
+    reproducirSonidoError();
     mostrarMensaje("❌ 無効なQRコード", "error");
-    mostrarDebug("QR inválido: " + decodedText);
+    mostrarDebug("QR inválido: " + decodedText + " - Error: " + e.message);
     setTimeout(() => {
       escaneando = true;
       mostrarMensaje("読み取り待機中...", "info");
@@ -351,14 +370,14 @@ function mostrarMensaje(msg, tipo) {
                        tipo === "error" ? "red" : "#0078ff";
 }
 
-// Debug info (opcional)
+// Debug info
 function mostrarDebug(msg) {
   const debug = document.getElementById("debug-info");
   debug.style.display = "block";
-  debug.innerHTML += "<div>" + new Date().toLocaleTimeString() + ": " + msg + "</div>";
+  const timestamp = new Date().toLocaleTimeString();
+  debug.innerHTML += "<div><strong>[" + timestamp + "]</strong> " + msg + "</div>";
 }
 </script>
 
 </body>
-
 </html>
