@@ -6,59 +6,15 @@
 <title>出退勤管理システム</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
-body {
-  font-family: "Noto Sans JP", sans-serif;
-  background: linear-gradient(135deg, #1e90ff, #00bfff);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  margin: 0;
-  color: #333;
-}
-
-section {
-  background: #fff;
-  padding: 30px;
-  border-radius: 20px;
-  box-shadow: 0 6px 25px rgba(0,0,0,0.25);
-  text-align: center;
-  width: 90%;
-  max-width: 400px;
-  display: none;
-}
-
-h2 { color: #0078ff; margin-bottom: 15px; font-size: 1.5rem; }
-
-input[type="password"] {
-  padding: 12px; width: 85%; font-size: 16px;
-  border-radius: 10px; border: 1px solid #ccc; margin-bottom: 15px;
-}
-
-button {
-  background: #0078ff; color: white; border: none;
-  padding: 12px 25px; border-radius: 10px; font-size: 16px; cursor: pointer;
-  transition: 0.3s;
-}
-
-button:hover { background: #005fcc; }
-
-#reader {
-  width: 100%; max-width: 300px; margin: 15px auto;
-  position: relative; border: 3px solid #0078ff; border-radius: 15px; overflow: hidden;
-}
-
-#status { margin-top: 12px; font-weight: bold; transition: color 0.3s; min-height: 24px; }
-
-#clock { font-size: 18px; font-weight: bold; color: #0078ff; margin-bottom: 10px; }
-
-footer { margin-top: 20px; font-size: 12px; color: #555; }
-
-.debug-info {
-  margin-top: 15px; padding: 10px; background: #f0f0f0;
-  border-radius: 8px; font-size: 12px; text-align: left;
-  max-height: 200px; overflow-y: auto;
-}
+body { font-family:"Noto Sans JP", sans-serif; background: linear-gradient(135deg, #1e90ff, #00bfff); display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; color:#333; }
+section { background:#fff; padding:30px; border-radius:20px; box-shadow:0 6px 25px rgba(0,0,0,0.25); text-align:center; width:90%; max-width:400px; display:none; }
+h2 { color:#0078ff; margin-bottom:15px; font-size:1.5rem; }
+input[type="password"] { padding:12px; width:85%; font-size:16px; border-radius:10px; border:1px solid #ccc; margin-bottom:15px; }
+button { background:#0078ff; color:white; border:none; padding:12px 25px; border-radius:10px; font-size:16px; cursor:pointer; transition:0.3s; }
+button:hover { background:#005fcc; }
+#reader { width:100%; max-width:300px; margin:15px auto; position:relative; border:3px solid #0078ff; border-radius:15px; overflow:hidden; }
+#status { margin-top:12px; font-weight:bold; transition: color 0.3s; min-height:24px; }
+#clock { font-size:18px; font-weight:bold; color:#0078ff; margin-bottom:10px; }
 </style>
 </head>
 <body>
@@ -79,175 +35,117 @@ footer { margin-top: 20px; font-size: 12px; color: #555; }
   <h2>📷 出退勤スキャン</h2>
   <div id="reader"></div>
   <p id="status">読み取り待機中...</p>
-  <div class="debug-info" id="debug-info"></div>
-  <footer>© 2025 JCAS システム</footer>
 </section>
 
 <script>
 const PASSWORD = "1234";
-const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby9cP46KLV2eSTLoLs5Hb-aJtl6knEbgDbxwP8lXFk5XBbFxHPChEUMFyyoilhUnrftyw/exec";
-let qrReader;
-let escaneando = true;
+const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby9cP46KLV2eSTLoLs5Hb-aJtl6knEbgDbxwP8lXFk5XBbFxHPChEUMFyyoilhUnrftyw/exec"; // <== PON TU URL DE APPS SCRIPT
+let qrReader, escaneando = true;
+
+// AUDIO
 let audioContext;
-let sonidosHabilitados = false;
-
-// 🔹 Inicializar audio
 function inicializarAudio() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    audioContext.resume(); // desbloquea audio en móviles
-    sonidosHabilitados = true;
-  }
+  if(!audioContext) audioContext = new (window.AudioContext||window.webkitAudioContext)();
 }
 
-// 🔹 Sonido inmediato al escanear
-function reproducirSonidoScan() {
-  if (!sonidosHabilitados) return;
+function reproducirSonidoScan(){
+  if(!audioContext) return;
+  audioContext.resume();
   const osc = audioContext.createOscillator();
   const gain = audioContext.createGain();
-  osc.connect(gain);
-  gain.connect(audioContext.destination);
-  osc.type = "square";
-  osc.frequency.setValueAtTime(600, audioContext.currentTime);
+  osc.connect(gain); gain.connect(audioContext.destination);
+  osc.frequency.setValueAtTime(880, audioContext.currentTime);
+  osc.type='square';
   gain.gain.setValueAtTime(0.2, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
   osc.start(audioContext.currentTime);
-  osc.stop(audioContext.currentTime + 0.2);
+  osc.stop(audioContext.currentTime +0.1);
 }
 
-// 🔹 Sonido al registrar OK
-function reproducirSonidoExito() {
-  if (!sonidosHabilitados) return;
+function reproducirSonidoExito(){
+  if(!audioContext) return;
+  audioContext.resume();
   const osc = audioContext.createOscillator();
   const gain = audioContext.createGain();
-  osc.connect(gain);
-  gain.connect(audioContext.destination);
-  osc.type = "sine";
+  osc.connect(gain); gain.connect(audioContext.destination);
   osc.frequency.setValueAtTime(523.25, audioContext.currentTime);
-  osc.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
-  osc.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2);
+  osc.type='sine';
   gain.gain.setValueAtTime(0.5, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime +0.5);
   osc.start(audioContext.currentTime);
-  osc.stop(audioContext.currentTime + 0.5);
+  osc.stop(audioContext.currentTime +0.5);
 }
 
-// 🔹 Sonido de error
-function reproducirSonidoError() {
-  if (!sonidosHabilitados) return;
-  const osc = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  osc.connect(gain);
-  gain.connect(audioContext.destination);
-  osc.type = "square";
-  osc.frequency.setValueAtTime(400, audioContext.currentTime);
-  gain.gain.setValueAtTime(0.2, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-  osc.start(audioContext.currentTime);
-  osc.stop(audioContext.currentTime + 0.4);
-}
-
-// 🔹 Login
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("login-container").style.display = "block";
+// LOGIN
+document.addEventListener("DOMContentLoaded", ()=>{
+  document.getElementById("login-container").style.display="block";
   document.getElementById("login-btn").addEventListener("click", login);
-  document.getElementById("password").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") login();
-  });
+  document.getElementById("password").addEventListener("keypress",(e)=>{if(e.key==="Enter") login();});
 });
 
-function login() {
+function login(){
   inicializarAudio();
   const input = document.getElementById("password").value.trim();
-  if (input === PASSWORD) {
-    document.getElementById("login-container").style.display = "none";
-    document.getElementById("scanner-container").style.display = "block";
+  if(input===PASSWORD){
+    document.getElementById("login-container").style.display="none";
+    document.getElementById("scanner-container").style.display="block";
     iniciarReloj();
     iniciarQR();
-  } else {
-    document.getElementById("login-error").style.display = "block";
-    reproducirSonidoError();
-    setTimeout(() => document.getElementById("login-error").style.display = "none", 3000);
+  } else{
+    const error=document.getElementById("login-error");
+    error.style.display="block";
+    setTimeout(()=>error.style.display="none",3000);
   }
 }
 
-// 🔹 Reloj japonés
-function iniciarReloj() {
-  const opciones = { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit' };
-  const reloj = document.getElementById("clock");
-  setInterval(() => { reloj.textContent = new Date().toLocaleString("ja-JP", opciones); }, 1000);
+// RELOJ
+function iniciarReloj(){
+  const opciones={timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',second:'2-digit',year:'numeric',month:'2-digit',day:'2-digit'};
+  const reloj=document.getElementById("clock");
+  setInterval(()=>{reloj.textContent=new Date().toLocaleString("ja-JP",opciones);},1000);
 }
 
-// 🔹 Inicializar QR
-function iniciarQR() {
+// QR
+function iniciarQR(){
   qrReader = new Html5Qrcode("reader");
-  const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
-
-  Html5Qrcode.getCameras().then(cameras => {
-    if (cameras && cameras.length) {
-      let camaraSeleccionada = cameras.find(cam => cam.label.toLowerCase().includes("front") || cam.label.toLowerCase().includes("user") || cam.label.toLowerCase().includes("facing")) || cameras[cameras.length-1];
-      qrReader.start(camaraSeleccionada.id, config, procesarQR, error => {});
-      mostrarMensaje("✅ カメラ準備完了 - QRをスキャンしてください", "success");
-    } else mostrarMensaje("❌ カメラが見つかりません", "error");
-  }).catch(err => mostrarMensaje("❌ カメラ取得エラー: " + err.message, "error"));
+  Html5Qrcode.getCameras().then(cameras=>{
+    if(cameras && cameras.length){
+      let camara=cameras.find(c=>c.label.toLowerCase().includes("front")||c.label.toLowerCase().includes("user"))||cameras[0];
+      qrReader.start(camara.id,{fps:10,qrbox:250},procesarQR,()=>{});
+    }
+  });
 }
 
-// 🔹 Procesar QR
-function procesarQR(decodedText) {
-  if (!escaneando) return;
-  escaneando = false;
-  mostrarMensaje("🔄 処理中...", "info");
-
-  // 🔹 Sonido al capturar QR
+// PROCESAR QR
+function procesarQR(decodedText){
+  if(!escaneando) return;
+  escaneando=false;
   reproducirSonidoScan();
 
-  try {
-    const datos = JSON.parse(decodedText);
-    if (!datos.id || !datos.nombre) throw new Error("ID o nombre faltante en QR");
+  try{
+    const datos=JSON.parse(decodedText);
+    if(!datos.id || !datos.nombre) throw new Error("ID o nombre faltante");
+    const params=new URLSearchParams();
+    params.append('id',datos.id);
+    params.append('nombre',datos.nombre);
+    const url=URL_SCRIPT+'?'+params.toString();
 
-    const params = new URLSearchParams();
-    params.append('id', datos.id);
-    params.append('nombre', datos.nombre);
-    if (datos.tipo) params.append('tipo', datos.tipo);
-    const urlConParams = URL_SCRIPT + '?' + params.toString();
-
-    fetch(urlConParams, { method:'GET', redirect:'follow' })
-      .then(response => response.text())
-      .then(data => {
-        mostrarDebug("Respuesta del servidor: " + data);
-        reproducirSonidoExito(); // 🔹 sonido al guardar correctamente
-        mostrarMensaje("✅ 登録OK", "success");
-        setTimeout(() => { escaneando = true; mostrarMensaje("読み取り待機中...", "info"); }, 2000);
-      })
-      .catch(err => {
-        console.error("通信エラー:", err);
-        reproducirSonidoError();
-        mostrarMensaje("❌ 送信エラー", "error");
-        setTimeout(() => { escaneando = true; mostrarMensaje("読み取り待機中...", "info"); }, 2000);
-      });
-
-  } catch (e) {
-    reproducirSonidoError();
-    mostrarMensaje("❌ 無効なQRコード", "error");
-    mostrarDebug("QR inválido: " + decodedText + " - Error: " + e.message);
-    setTimeout(() => { escaneando = true; mostrarMensaje("読み取り待機中...", "info"); }, 2000);
+    fetch(url).then(r=>r.json()).then(resultado=>{
+      if(resultado.status==="success"){
+        reproducirSonidoExito();
+        document.getElementById("status").textContent="✅ 登録OK";
+      } else{
+        document.getElementById("status").textContent="❌ エラー";
+      }
+      setTimeout(()=>{escaneando=true; document.getElementById("status").textContent="読み取り待機中...";},2000);
+    }).catch(e=>{
+      document.getElementById("status").textContent="❌ 送信エラー";
+      setTimeout(()=>{escaneando=true; document.getElementById("status").textContent="読み取り待機中...";},3000);
+    });
+  } catch(e){
+    document.getElementById("status").textContent="❌ 無効なQRコード";
+    setTimeout(()=>{escaneando=true; document.getElementById("status").textContent="読み取り待機中...";},2000);
   }
 }
-
-// 🔹 Mensajes y debug
-function mostrarMensaje(msg, tipo) {
-  const status = document.getElementById("status");
-  status.textContent = msg;
-  status.style.color = tipo === "success" ? "green" : tipo==="error" ? "red" : "#0078ff";
-}
-function mostrarDebug(msg) {
-  const debug = document.getElementById("debug-info");
-  debug.style.display = "block
-  debug.innerHTML += "<div><strong>[" + new Date().toLocaleTimeString() + "]</strong> " + msg + "</div>";
-}
 </script>
-
 </body>
 </html>
-
-
