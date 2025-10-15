@@ -12,8 +12,10 @@ h2 { color:#0078ff; margin-bottom:15px; font-size:1.5rem; }
 input[type="password"] { padding:12px; width:85%; font-size:16px; border-radius:10px; border:1px solid #ccc; margin-bottom:15px; }
 button { background:#0078ff; color:white; border:none; padding:12px 25px; border-radius:10px; font-size:16px; cursor:pointer; transition:0.3s; }
 button:hover { background:#005fcc; }
-#reader { width:100%; max-width:300px; margin:15px auto; position:relative; border:3px solid #0078ff; border-radius:15px; overflow:hidden; }
-#status { margin-top:12px; font-weight:bold; transition: color 0.3s; min-height:24px; }
+#reader { width:100%; max-width:300px; margin:15px auto; position:relative; }
+#qr-guide { position:absolute; top:0; left:0; width:100%; height:100%; border:3px dashed #0078ff; border-radius:15px; pointer-events:none; box-sizing:border-box; }
+#status { margin-top:12px; font-weight:bold; transition: color 0.3s; min-height:24px; font-size:18px; }
+#confirmation { margin-top:15px; font-size:24px; font-weight:bold; min-height:40px; transition: all 0.5s ease; }
 #clock { font-size:18px; font-weight:bold; color:#0078ff; margin-bottom:10px; }
 </style>
 </head>
@@ -33,56 +35,34 @@ button:hover { background:#005fcc; }
 <section id="scanner-container" style="display:none;">
   <div id="clock">--:--:--</div>
   <h2>📷 出退勤スキャン</h2>
-  <div id="reader"></div>
+  <div id="reader">
+    <div id="qr-guide"></div>
+  </div>
   <p id="status">読み取り待機中...</p>
+  <div id="confirmation"></div>
 </section>
 
 <script>
-const PASSWORD = "1234";
-const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby9cP46KLV2eSTLoLs5Hb-aJtl6knEbgDbxwP8lXFk5XBbFxHPChEUMFyyoilhUnrftyw/exec"; // <== PON TU URL DE APPS SCRIPT
-let qrReader, escaneando = true;
+const PASSWORD="1234";
+const URL_SCRIPT="https://script.google.com/macros/s/AKfycby9cP46KLV2eSTLoLs5Hb-aJtl6knEbgDbxwP8lXFk5XBbFxHPChEUMFyyoilhUnrftyw/exec"; // <== TU URL DE APPS SCRIPT
+let qrReader, escaneando=true;
 
 // AUDIO
 let audioContext;
-function inicializarAudio() {
-  if(!audioContext) audioContext = new (window.AudioContext||window.webkitAudioContext)();
-}
-function reproducirSonidoScan(){
-  if(!audioContext) return;
-  audioContext.resume();
-  const osc = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  osc.connect(gain); gain.connect(audioContext.destination);
-  osc.frequency.setValueAtTime(880, audioContext.currentTime);
-  osc.type='square';
-  gain.gain.setValueAtTime(0.2, audioContext.currentTime);
-  osc.start(audioContext.currentTime);
-  osc.stop(audioContext.currentTime +0.1);
-}
-function reproducirSonidoExito(){
-  if(!audioContext) return;
-  audioContext.resume();
-  const osc = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  osc.connect(gain); gain.connect(audioContext.destination);
-  osc.frequency.setValueAtTime(523.25, audioContext.currentTime);
-  osc.type='sine';
-  gain.gain.setValueAtTime(0.5, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime +0.5);
-  osc.start(audioContext.currentTime);
-  osc.stop(audioContext.currentTime +0.5);
-}
+function inicializarAudio(){if(!audioContext) audioContext=new (window.AudioContext||window.webkitAudioContext)();}
+function reproducirSonidoScan(){if(!audioContext) return; audioContext.resume(); const osc=audioContext.createOscillator(); const gain=audioContext.createGain(); osc.connect(gain); gain.connect(audioContext.destination); osc.frequency.setValueAtTime(880,audioContext.currentTime); osc.type='square'; gain.gain.setValueAtTime(0.2,audioContext.currentTime); osc.start(audioContext.currentTime); osc.stop(audioContext.currentTime+0.1);}
+function reproducirSonidoExito(){if(!audioContext) return; audioContext.resume(); const osc=audioContext.createOscillator(); const gain=audioContext.createGain(); osc.connect(gain); gain.connect(audioContext.destination); osc.frequency.setValueAtTime(523.25,audioContext.currentTime); osc.type='sine'; gain.gain.setValueAtTime(0.5,audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioContext.currentTime+0.5); osc.start(audioContext.currentTime); osc.stop(audioContext.currentTime+0.5);}
 
 // LOGIN
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("login-container").style.display="block";
-  document.getElementById("login-btn").addEventListener("click", login);
+  document.getElementById("login-btn").addEventListener("click",login);
   document.getElementById("password").addEventListener("keypress",(e)=>{if(e.key==="Enter") login();});
 });
 
 function login(){
   inicializarAudio();
-  const input = document.getElementById("password").value.trim();
+  const input=document.getElementById("password").value.trim();
   if(input===PASSWORD){
     document.getElementById("login-container").style.display="none";
     document.getElementById("scanner-container").style.display="block";
@@ -104,17 +84,13 @@ function iniciarReloj(){
 
 // QR
 function iniciarQR(){
-  qrReader = new Html5Qrcode("reader");
+  qrReader=new Html5Qrcode("reader");
   Html5Qrcode.getCameras().then(cameras=>{
     if(cameras && cameras.length){
       let camara=cameras.find(c=>c.label.toLowerCase().includes("front")||c.label.toLowerCase().includes("user"))||cameras[0];
       qrReader.start(camara.id,{fps:10,qrbox:250},procesarQR,()=>{});
-    } else{
-      document.getElementById("status").textContent="❌ カメラが見つかりません";
-    }
-  }).catch(e=>{
-    document.getElementById("status").textContent="❌ カメラ取得エラー";
-  });
+    } else{document.getElementById("status").textContent="❌ カメラが見つかりません";}
+  }).catch(e=>{document.getElementById("status").textContent="❌ カメラ取得エラー";});
 }
 
 // PROCESAR QR
@@ -122,6 +98,7 @@ function procesarQR(decodedText){
   if(!escaneando) return;
   escaneando=false;
   reproducirSonidoScan();
+  document.getElementById("confirmation").textContent=""; // limpiar
   try{
     const datos=JSON.parse(decodedText);
     if(!datos.id||!datos.nombre) throw new Error("ID o nombre faltante");
@@ -133,7 +110,9 @@ function procesarQR(decodedText){
     fetch(url).then(r=>r.json()).then(resultado=>{
       if(resultado.status==="success"){
         reproducirSonidoExito();
-        document.getElementById("status").textContent="✅ 登録OK ("+resultado.tipo+")";
+        const mensaje=(resultado.tipo==="出勤")?"🚀 出勤":"🏁 退勤";
+        document.getElementById("confirmation").textContent=mensaje;
+        document.getElementById("status").textContent="✅ 登録OK";
       } else{
         document.getElementById("status").textContent="❌ エラー";
       }
