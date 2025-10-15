@@ -87,17 +87,6 @@
     font-size: 12px;
     color: #555;
   }
-
-  .debug-info {
-    margin-top: 15px;
-    padding: 10px;
-    background: #f0f0f0;
-    border-radius: 8px;
-    font-size: 12px;
-    text-align: left;
-    max-height: 200px;
-    overflow-y: auto;
-  }
 </style>
 </head>
 <body>
@@ -118,7 +107,6 @@
   <h2>📷 出退勤スキャン</h2>
   <div id="reader"></div>
   <p id="status">読み取り待機中...</p>
-  <div class="debug-info" id="debug-info"></div>
   <footer>© 2025 JCAS システム</footer>
 </section>
 
@@ -128,76 +116,42 @@ const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyGd3h1n9qT4LaoqlOp0
 let qrReader;
 let escaneando = true;
 
-// Contexto de audio
+// Audio
 let audioContext;
-let sonidosHabilitados = false;
-
-// Inicializar audio context
 function inicializarAudio() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    sonidosHabilitados = true;
-  }
+  if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
 }
-
-// Reproducir sonido de éxito
 function reproducirSonidoExito() {
-  if (!sonidosHabilitados) return;
-  
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
-  
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  
-  oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
-  oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
-  oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2);
-  
-  oscillator.type = 'sine';
-  gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-  
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + 0.5);
+  if (!audioContext) return;
+  const osc = audioContext.createOscillator(), gain = audioContext.createGain();
+  osc.connect(gain); gain.connect(audioContext.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(660, audioContext.currentTime);
+  gain.gain.setValueAtTime(0.4, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+  osc.start(); osc.stop(audioContext.currentTime + 0.5);
 }
-
-// Reproducir sonido de error
 function reproducirSonidoError() {
-  if (!sonidosHabilitados) return;
-  
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
-  
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  
-  oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-  oscillator.frequency.setValueAtTime(300, audioContext.currentTime + 0.1);
-  oscillator.frequency.setValueAtTime(200, audioContext.currentTime + 0.2);
-  
-  oscillator.type = 'square';
-  gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-  
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + 0.4);
+  if (!audioContext) return;
+  const osc = audioContext.createOscillator(), gain = audioContext.createGain();
+  osc.connect(gain); gain.connect(audioContext.destination);
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(220, audioContext.currentTime);
+  gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+  osc.start(); osc.stop(audioContext.currentTime + 0.4);
 }
 
-// Mostrar login al cargar
+// Mostrar login
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("login-container").style.display = "block";
   document.getElementById("login-btn").addEventListener("click", login);
-  
-  document.getElementById("password").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") login();
-  });
+  document.getElementById("password").addEventListener("keypress", e => { if (e.key === "Enter") login(); });
 });
 
 // Login
 function login() {
   inicializarAudio();
-  
   const input = document.getElementById("password").value.trim();
   if (input === PASSWORD) {
     document.getElementById("login-container").style.display = "none";
@@ -214,151 +168,68 @@ function login() {
 
 // Reloj japonés
 function iniciarReloj() {
-  const opciones = { 
-    timeZone: 'Asia/Tokyo',
-    hour: '2-digit', 
-    minute: '2-digit', 
-    second: '2-digit',
-    year: 'numeric', 
-    month: '2-digit', 
-    day: '2-digit'
-  };
   const reloj = document.getElementById("clock");
   setInterval(() => {
-    reloj.textContent = new Date().toLocaleString("ja-JP", opciones);
+    const f = new Date().toLocaleString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+    reloj.textContent = f;
   }, 1000);
 }
 
-// Inicializar QR
+// Iniciar QR
 function iniciarQR() {
   mostrarMensaje("カメラを起動中...", "info");
   qrReader = new Html5Qrcode("reader");
-  
-  const config = { 
-    fps: 10, 
-    qrbox: { width: 250, height: 250 },
-    aspectRatio: 1.0
-  };
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
   Html5Qrcode.getCameras().then(cameras => {
-    if (cameras && cameras.length) {
-      mostrarMensaje(`${cameras.length}台のカメラを検出`, "info");
-      
-      let camaraSeleccionada = cameras.find(cam => 
-        cam.label.toLowerCase().includes("front") || 
-        cam.label.toLowerCase().includes("user") ||
-        cam.label.toLowerCase().includes("facing")
-      );
-      
-      if (!camaraSeleccionada) {
-        camaraSeleccionada = cameras[cameras.length - 1];
-      }
-
-      mostrarMensaje(`カメラ起動中: ${camaraSeleccionada.label}`, "info");
-
-      qrReader.start(
-        camaraSeleccionada.id,
-        config,
-        procesarQR,
-        error => {}
-      ).then(() => {
-        mostrarMensaje("✅ カメラ準備完了 - QRをスキャンしてください", "success");
-      }).catch(err => {
-        console.error("Error al iniciar QR:", err);
-        mostrarMensaje("❌ カメラの初期化エラー: " + err.message, "error");
-        mostrarDebug("Error: " + err.message);
-      });
-
+    if (cameras.length) {
+      let camaraSeleccionada = cameras.find(c => /front|user|facing/i.test(c.label)) || cameras[cameras.length - 1];
+      qrReader.start(camaraSeleccionada.id, config, procesarQR, () => {});
+      mostrarMensaje("✅ カメラ準備完了 - QRをスキャンしてください", "success");
     } else {
       mostrarMensaje("❌ カメラが見つかりません", "error");
-      mostrarDebug("No se encontraron cámaras");
     }
-  }).catch(err => {
-    console.error("Error al obtener cámaras:", err);
-    mostrarMensaje("❌ カメラ取得エラー: " + err.message, "error");
-    mostrarDebug("Error al obtener cámaras: " + err.message);
-  });
+  }).catch(err => mostrarMensaje("❌ カメラエラー: " + err.message, "error"));
 }
 
-// Procesar QR - MÉTODO CORREGIDO
+// Procesar QR
 function procesarQR(decodedText) {
   if (!escaneando) return;
-  
   escaneando = false;
   mostrarMensaje("🔄 処理中...", "info");
-  mostrarDebug("QR detectado: " + decodedText);
   
   try {
     const datos = JSON.parse(decodedText);
-    
-    if (!datos.id || !datos.nombre) {
-      throw new Error("ID o nombre faltante en QR");
-    }
-    
-    mostrarDebug("Datos parseados correctamente: ID=" + datos.id + ", Nombre=" + datos.nombre);
-    mostrarMensaje("📤 送信中...", "info");
+    if (!datos.id || !datos.nombre) throw new Error("QRデータが無効です");
 
-    // CAMBIO CRÍTICO: Usar URLSearchParams en lugar de JSON
-    const params = new URLSearchParams();
-    params.append('id', datos.id);
-    params.append('nombre', datos.nombre);
-    if (datos.tipo) params.append('tipo', datos.tipo);
+    const params = new URLSearchParams({ id: datos.id, nombre: datos.nombre });
+    if (datos.tipo) params.append("tipo", datos.tipo);
 
-    const urlConParams = URL_SCRIPT + '?' + params.toString();
-    
-    mostrarDebug("URL de envío: " + urlConParams);
-
-    // Usar método GET con parámetros
-    fetch(urlConParams, {
-      method: 'GET',
-      redirect: 'follow'
-    })
-    .then(response => {
-      mostrarDebug("Respuesta status: " + response.status);
-      return response.text();
-    })
-    .then(data => {
-      mostrarDebug("Respuesta del servidor: " + data);
-      try {
-        const resultado = JSON.parse(data);
-        if (resultado.status === "success") {
+    fetch(URL_SCRIPT + "?" + params.toString())
+      .then(r => r.text())
+      .then(texto => {
+        if (texto.trim() === "OK") {
           reproducirSonidoExito();
-          mostrarMensaje("✅ 登録OK", "success");
+          mostrarMensaje("✅ 登録完了", "success");
         } else {
           reproducirSonidoError();
-          mostrarMensaje("❌ エラー", "error");
+          mostrarMensaje("⚠️ エラー: " + texto, "error");
         }
-      } catch (e) {
-        // Si no es JSON, probablemente sea exitoso
-        reproducirSonidoExito();
-        mostrarMensaje("✅ 登録OK", "success");
-      }
-      
-      setTimeout(() => {
-        escaneando = true;
-        mostrarMensaje("読み取り待機中...", "info");
-      }, 2000);
-    })
-    .catch(err => {
-      console.error("通信エラー:", err);
-      reproducirSonidoError();
-      mostrarMensaje("❌ 送信エラー: " + err.message, "error");
-      mostrarDebug("Error de comunicación: " + err.message);
-      setTimeout(() => {
-        escaneando = true;
-        mostrarMensaje("読み取り待機中...", "info");
-      }, 3000);
-    });
-    
+        setTimeout(() => { escaneando = true; mostrarMensaje("読み取り待機中...", "info"); }, 2000);
+      })
+      .catch(err => {
+        reproducirSonidoError();
+        mostrarMensaje("❌ 通信エラー", "error");
+        setTimeout(() => { escaneando = true; mostrarMensaje("読み取り待機中...", "info"); }, 3000);
+      });
   } catch (e) {
-    console.warn("QR no válido:", decodedText);
     reproducirSonidoError();
     mostrarMensaje("❌ 無効なQRコード", "error");
-    mostrarDebug("QR inválido: " + decodedText + " - Error: " + e.message);
-    setTimeout(() => {
-      escaneando = true;
-      mostrarMensaje("読み取り待機中...", "info");
-    }, 2000);
+    setTimeout(() => { escaneando = true; mostrarMensaje("読み取り待機中...", "info"); }, 2000);
   }
 }
 
@@ -369,17 +240,6 @@ function mostrarMensaje(msg, tipo) {
   status.style.color = tipo === "success" ? "green" :
                        tipo === "error" ? "red" : "#0078ff";
 }
-
-// Debug info
-function mostrarDebug(msg) {
-  const debug = document.getElementById("debug-info");
-  debug.style.display = "block";
-  const timestamp = new Date().toLocaleTimeString();
-  debug.innerHTML += "<div><strong>[" + timestamp + "]</strong> " + msg + "</div>";
-}
 </script>
-
 </body>
 </html>
-
-
