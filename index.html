@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出退勤管理システム</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+  body {
+    font-family: "Noto Sans JP", sans-serif;
+    background: linear-gradient(135deg, #1e90ff, #00bfff);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    color: #333;
+  }
+
+  section {
+    background: #fff;
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 6px 25px rgba(0,0,0,0.25);
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+    display: none;
+  }
+
+  h2 {
+    color: #0078ff;
+    margin-bottom: 15px;
+    font-size: 1.5rem;
+  }
+
+  input[type="password"] {
+    padding: 12px;
+    width: 85%;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    margin-bottom: 15px;
+  }
+
+  button {
+    background: #0078ff;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  button:hover {
+    background: #005fcc;
+  }
+
+  #reader {
+    width: 100%;
+    max-width: 300px;
+    margin: 15px auto;
+    position: relative;
+    border: 3px solid #0078ff;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+
+  #status {
+    margin-top: 12px;
+    font-weight: bold;
+    transition: color 0.3s;
+    min-height: 24px;
+  }
+
+  #clock {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0078ff;
+    margin-bottom: 10px;
+  }
+
+  footer {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #555;
+  }
+
+  .debug-info {
+    margin-top: 15px;
+    padding: 10px;
+    background: #f0f0f0;
+    border-radius: 8px;
+    font-size: 12px;
+    text-align: left;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login-container">
+  <h2>🔒 ログイン</h2>
+  <p>パスワードを入力してください</p>
+  <input type="password" id="password" placeholder="パスワード">
+  <br>
+  <button id="login-btn">ログイン</button>
+  <p id="login-error" style="color:red; display:none;">❌ パスワードが間違っています</p>
+</section>
+
+<!-- SCANNER -->
+<section id="scanner-container">
+  <div id="clock">--:--:--</div>
+  <h2>📷 出退勤スキャン</h2>
+  <div id="reader"></div>
+  <p id="status">読み取り待機中...</p>
+  <div class="debug-info" id="debug-info"></div>
+  <footer>© 2025 JCAS システム</footer>
+</section>
+
+<script>
+const PASSWORD = "1234";
+const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbzkUFd-ahkimblOQoxJkj7K14qZxd7XoeVs85pnmzt72oA5w-NhK8u_7jZC4dTF9RDUxw/exec";
+let qrReader;
+let escaneando = true;
+
+// Contexto de audio
+let audioContext;
+let sonidosHabilitados = false;
+
+// Inicializar audio context (requiere interacción del usuario)
+function inicializarAudio() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    sonidosHabilitados = true;
+  }
+}
+
+// Reproducir sonido de éxito (tono agradable)
+function reproducirSonidoExito() {
+  if (!sonidosHabilitados) return;
+  
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  // Melodía ascendente agradable
+  oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+  oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+  oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+  
+  oscillator.type = 'sine';
+  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + 0.5);
+}
+
+// Reproducir sonido de error (tono de advertencia)
+function reproducirSonidoError() {
+  if (!sonidosHabilitados) return;
+  
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  // Tono descendente de error
+  oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+  oscillator.frequency.setValueAtTime(300, audioContext.currentTime + 0.1);
+  oscillator.frequency.setValueAtTime(200, audioContext.currentTime + 0.2);
+  
+  oscillator.type = 'square';
+  gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + 0.4);
+}
+
+// Mostrar login al cargar
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("login-container").style.display = "block";
+  document.getElementById("login-btn").addEventListener("click", login);
+  
+  // Enter en password
+  document.getElementById("password").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") login();
+  });
+});
+
+// Login
+function login() {
+  // Inicializar audio con interacción del usuario
+  inicializarAudio();
+  
+  const input = document.getElementById("password").value.trim();
+  if (input === PASSWORD) {
+    document.getElementById("login-container").style.display = "none";
+    document.getElementById("scanner-container").style.display = "block";
+    iniciarReloj();
+    iniciarQR();
+  } else {
+    const error = document.getElementById("login-error");
+    error.style.display = "block";
+    reproducirSonidoError();
+    setTimeout(() => error.style.display = "none", 3000);
+  }
+}
+
+// Reloj japonés
+function iniciarReloj() {
+  const opciones = { 
+    timeZone: 'Asia/Tokyo',
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit',
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit'
+  };
+  const reloj = document.getElementById("clock");
+  setInterval(() => {
+    reloj.textContent = new Date().toLocaleString("ja-JP", opciones);
+  }, 1000);
+}
+
+// Inicializar QR
+function iniciarQR() {
+  mostrarMensaje("カメラを起動中...", "info");
+  qrReader = new Html5Qrcode("reader");
+  
+  const config = { 
+    fps: 10, 
+    qrbox: { width: 250, height: 250 },
+    aspectRatio: 1.0
+  };
+
+  Html5Qrcode.getCameras().then(cameras => {
+    if (cameras && cameras.length) {
+      mostrarMensaje(`${cameras.length}台のカメラを検出`, "info");
+      
+      // Preferir cámara frontal (selfie) para que el personal vea la pantalla
+      let camaraSeleccionada = cameras.find(cam => 
+        cam.label.toLowerCase().includes("front") || 
+        cam.label.toLowerCase().includes("user") ||
+        cam.label.toLowerCase().includes("facing")
+      );
+      
+      // Si no hay frontal, usar la última (suele ser frontal)
+      if (!camaraSeleccionada) {
+        camaraSeleccionada = cameras[cameras.length - 1];
+      }
+
+      mostrarMensaje(`カメラ起動中: ${camaraSeleccionada.label}`, "info");
+
+      qrReader.start(
+        camaraSeleccionada.id,
+        config,
+        procesarQR,
+        error => {
+          // Ignorar errores de escaneo continuo
+        }
+      ).then(() => {
+        mostrarMensaje("✅ カメラ準備完了 - QRをスキャンしてください", "success");
+      }).catch(err => {
+        console.error("Error al iniciar QR:", err);
+        mostrarMensaje("❌ カメラの初期化エラー: " + err.message, "error");
+        mostrarDebug("Error: " + err.message);
+      });
+
+    } else {
+      mostrarMensaje("❌ カメラが見つかりません", "error");
+      mostrarDebug("No se encontraron cámaras disponibles");
+    }
+  }).catch(err => {
+    console.error("Error al obtener cámaras:", err);
+    mostrarMensaje("❌ カメラ取得エラー: " + err.message, "error");
+    mostrarDebug("Error al obtener cámaras: " + err.message);
+  });
+}
+
+// Procesar QR
+function procesarQR(decodedText) {
+  if (!escaneando) return;
+  
+  escaneando = false;
+  mostrarMensaje("🔄 処理中...", "info");
+  
+  try {
+    // Intentar parsear como JSON
+    const datos = JSON.parse(decodedText);
+    
+    if (!datos.id || !datos.nombre) {
+      throw new Error("ID o nombre faltante en QR");
+    }
+    
+    mostrarDebug("Datos QR: " + JSON.stringify(datos));
+    mostrarMensaje("📤 送信中...", "info");
+
+    fetch(URL_SCRIPT, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos)
+    })
+    .then(() => {
+      // Con no-cors no podemos leer la respuesta
+      reproducirSonidoExito(); // ✅ SONIDO DE ÉXITO
+      mostrarMensaje("✅ 登録完了: " + datos.nombre, "success");
+      setTimeout(() => {
+        escaneando = true;
+        mostrarMensaje("読み取り待機中...", "info");
+      }, 3000);
+    })
+    .catch(err => {
+      console.error("通信エラー:", err);
+      reproducirSonidoError(); // ❌ SONIDO DE ERROR
+      mostrarMensaje("❌ 送信エラー", "error");
+      mostrarDebug("Error de comunicación: " + err.message);
+      setTimeout(() => {
+        escaneando = true;
+        mostrarMensaje("読み取り待機中...", "info");
+      }, 3000);
+    });
+    
+  } catch (e) {
+    console.warn("QR no válido:", decodedText);
+    reproducirSonidoError(); // ❌ SONIDO DE ERROR
+    mostrarMensaje("❌ 無効なQRコード", "error");
+    mostrarDebug("QR inválido: " + decodedText);
+    setTimeout(() => {
+      escaneando = true;
+      mostrarMensaje("読み取り待機中...", "info");
+    }, 2000);
+  }
+}
+
+// Mostrar mensajes
+function mostrarMensaje(msg, tipo) {
+  const status = document.getElementById("status");
+  status.textContent = msg;
+  status.style.color = tipo === "success" ? "green" :
+                       tipo === "error" ? "red" : "#0078ff";
+}
+
+// Debug info (opcional)
+function mostrarDebug(msg) {
+  const debug = document.getElementById("debug-info");
+  debug.style.display = "block";
+  debug.innerHTML += "<div>" + new Date().toLocaleTimeString() + ": " + msg + "</div>";
+}
+</script>
+
+</body>
+</html>
