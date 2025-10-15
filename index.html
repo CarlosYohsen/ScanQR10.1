@@ -124,7 +124,7 @@
 
 <script>
 const PASSWORD = "1234";
-const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw1sFNnbOTmKMFqZ_NYEtd6qa-rtxgOC4WFBLQzoW_9i9hxFTunUzWdWdGSJO3oOtMkdw/exec";
+const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbzkUFd-ahkimblOQoxJkj7K14qZxd7XoeVs85pnmzt72oA5w-NhK8u_7jZC4dTF9RDUxw/exec";
 let qrReader;
 let escaneando = true;
 
@@ -155,7 +155,7 @@ function reproducirSonidoExito() {
   oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2);
   
   oscillator.type = 'sine';
-  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
   gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
   
   oscillator.start(audioContext.currentTime);
@@ -323,21 +323,21 @@ function procesarQR(decodedText) {
         const resultado = JSON.parse(data);
         if (resultado.status === "success") {
           reproducirSonidoExito();
-          mostrarMensaje("✅ 登録完了: " + datos.nombre, "success");
+          mostrarMensaje("✅ 登録OK", "success");
         } else {
           reproducirSonidoError();
-          mostrarMensaje("❌ エラー: " + resultado.message, "error");
+          mostrarMensaje("❌ エラー", "error");
         }
       } catch (e) {
         // Si no es JSON, probablemente sea exitoso
         reproducirSonidoExito();
-        mostrarMensaje("✅ 登録完了: " + datos.nombre, "success");
+        mostrarMensaje("✅ 登録OK", "success");
       }
       
       setTimeout(() => {
         escaneando = true;
         mostrarMensaje("読み取り待機中...", "info");
-      }, 3000);
+      }, 2000);
     })
     .catch(err => {
       console.error("通信エラー:", err);
@@ -381,4 +381,3 @@ function mostrarDebug(msg) {
 
 </body>
 </html>
-
