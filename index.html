@@ -34,7 +34,7 @@ button:hover { background:#005fcc; }
 <!-- SCANNER -->
 <section id="scanner-container" style="display:none;">
   <div id="clock">--:--:--</div>
-  <h2>📷 出退勤スキャン</h2>
+  <h2>📷 QRスキャン</h2>
   <div id="reader">
     <div id="qr-guide"></div>
   </div>
@@ -121,8 +121,8 @@ function procesarQR(decodedText){
         if(resultado.status==="success"){
           reproducirSonidoExito();
           let color, mensajeTipo;
-          if(resultado.tipo==="出勤"){ color="green"; mensajeTipo="🚀 出勤"; }
-          else { color="orange"; mensajeTipo="🏁 退勤"; }
+          if(resultado.tipo==="出勤"){ color="green"; mensajeTipo=" 出勤"; }
+          else { color="orange"; mensajeTipo=" 退勤"; }
 
           confirmation.textContent = `${datos.nombre} さん ${mensajeTipo} 登録完了`;
           confirmation.style.color = color;
@@ -153,3 +153,4 @@ function procesarQR(decodedText){
 </script>
 </body>
 </html>
+
