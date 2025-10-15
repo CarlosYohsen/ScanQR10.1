@@ -6,8 +6,8 @@
 <title>出退勤管理システム</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
-body { font-family:"Noto Sans JP", sans-serif; background: linear-gradient(135deg, #1e90ff, #00bfff); display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; color:#333; }
-section { background:#fff; padding:30px; border-radius:20px; box-shadow:0 6px 25px rgba(0,0,0,0.25); text-align:center; width:90%; max-width:400px; display:none; }
+body { font-family:"Noto Sans JP",sans-serif; background: linear-gradient(135deg,#1e90ff,#00bfff); display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; color:#333; }
+section { background:#fff; padding:30px; border-radius:20px; box-shadow:0 6px 25px rgba(0,0,0,0.25); text-align:center; width:90%; max-width:400px; }
 h2 { color:#0078ff; margin-bottom:15px; font-size:1.5rem; }
 input[type="password"] { padding:12px; width:85%; font-size:16px; border-radius:10px; border:1px solid #ccc; margin-bottom:15px; }
 button { background:#0078ff; color:white; border:none; padding:12px 25px; border-radius:10px; font-size:16px; cursor:pointer; transition:0.3s; }
@@ -30,7 +30,7 @@ button:hover { background:#005fcc; }
 </section>
 
 <!-- SCANNER -->
-<section id="scanner-container">
+<section id="scanner-container" style="display:none;">
   <div id="clock">--:--:--</div>
   <h2>📷 出退勤スキャン</h2>
   <div id="reader"></div>
@@ -47,7 +47,6 @@ let audioContext;
 function inicializarAudio() {
   if(!audioContext) audioContext = new (window.AudioContext||window.webkitAudioContext)();
 }
-
 function reproducirSonidoScan(){
   if(!audioContext) return;
   audioContext.resume();
@@ -60,7 +59,6 @@ function reproducirSonidoScan(){
   osc.start(audioContext.currentTime);
   osc.stop(audioContext.currentTime +0.1);
 }
-
 function reproducirSonidoExito(){
   if(!audioContext) return;
   audioContext.resume();
@@ -97,7 +95,7 @@ function login(){
   }
 }
 
-// RELOJ
+// RELOJ JAPONES
 function iniciarReloj(){
   const opciones={timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',second:'2-digit',year:'numeric',month:'2-digit',day:'2-digit'};
   const reloj=document.getElementById("clock");
@@ -111,7 +109,11 @@ function iniciarQR(){
     if(cameras && cameras.length){
       let camara=cameras.find(c=>c.label.toLowerCase().includes("front")||c.label.toLowerCase().includes("user"))||cameras[0];
       qrReader.start(camara.id,{fps:10,qrbox:250},procesarQR,()=>{});
+    } else{
+      document.getElementById("status").textContent="❌ カメラが見つかりません";
     }
+  }).catch(e=>{
+    document.getElementById("status").textContent="❌ カメラ取得エラー";
   });
 }
 
@@ -120,10 +122,9 @@ function procesarQR(decodedText){
   if(!escaneando) return;
   escaneando=false;
   reproducirSonidoScan();
-
   try{
     const datos=JSON.parse(decodedText);
-    if(!datos.id || !datos.nombre) throw new Error("ID o nombre faltante");
+    if(!datos.id||!datos.nombre) throw new Error("ID o nombre faltante");
     const params=new URLSearchParams();
     params.append('id',datos.id);
     params.append('nombre',datos.nombre);
@@ -132,7 +133,7 @@ function procesarQR(decodedText){
     fetch(url).then(r=>r.json()).then(resultado=>{
       if(resultado.status==="success"){
         reproducirSonidoExito();
-        document.getElementById("status").textContent="✅ 登録OK";
+        document.getElementById("status").textContent="✅ 登録OK ("+resultado.tipo+")";
       } else{
         document.getElementById("status").textContent="❌ エラー";
       }
@@ -141,6 +142,7 @@ function procesarQR(decodedText){
       document.getElementById("status").textContent="❌ 送信エラー";
       setTimeout(()=>{escaneando=true; document.getElementById("status").textContent="読み取り待機中...";},3000);
     });
+
   } catch(e){
     document.getElementById("status").textContent="❌ 無効なQRコード";
     setTimeout(()=>{escaneando=true; document.getElementById("status").textContent="読み取り待機中...";},2000);
